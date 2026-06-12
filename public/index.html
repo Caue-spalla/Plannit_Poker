@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jorbe Poker™ - by Jorbe Guaraná</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥤</text></svg>">
+</head>
+<body>
+  <div class="container">
+    <header class="lobby-header">
+      <div class="brand-logo">🥤</div>
+      <h1>Jorbe Poker™</h1>
+      <p class="subtitle">Planning Poker com sabor de guaraná — refrescante e sem limite de jogadores</p>
+      <p class="brand-tagline">Uma ferramenta <strong>Jorbe Guaraná®</strong></p>
+    </header>
+
+    <main class="lobby-main">
+      <div class="card create-room-card">
+        <h2>🍾 Abrir Mesa Nova</h2>
+        <form id="create-room-form">
+          <div class="form-group">
+            <label for="room-name">Nome da Mesa</label>
+            <input type="text" id="room-name" placeholder="Ex: Sprint 42 Planning" required>
+          </div>
+
+          <div class="form-group">
+            <label for="your-name">Seu Nome</label>
+            <input type="text" id="your-name" placeholder="Ex: João Silva" required>
+          </div>
+
+          <div class="form-group">
+            <label for="deck-type">Tipo de Deck</label>
+            <select id="deck-type">
+              <option value="fibonacci">Fibonacci (0, 1, 2, 3, 5, 8, 13, 21...)</option>
+              <option value="hours_sequential">Horas 1-50 (1h, 2h, 3h... 50h)</option>
+              <option value="tshirt">T-Shirt (XS, S, M, L, XL, XXL)</option>
+              <option value="powers">Potências de 2 (0, 1, 2, 4, 8, 16...)</option>
+              <option value="hours">Horas espaçadas (0, 1, 2, 4, 6, 8, 12...)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="room-secret">🔑 Senha do Jorbe</label>
+            <input type="password" id="room-secret" placeholder="Só quem sabe, sabe..." required>
+            <small class="form-hint">Peça pro Jorbe se não souber 😎</small>
+          </div>
+
+          <div id="create-error" class="form-error" style="display:none;"></div>
+
+          <button type="submit" class="btn btn-primary">🥤 Criar Mesa</button>
+        </form>
+      </div>
+
+      <div class="card join-room-card">
+        <h2>🎯 Entrar na Mesa</h2>
+        <form id="join-room-form">
+          <div class="form-group">
+            <label for="join-room-id">Código da Mesa</label>
+            <input type="text" id="join-room-id" placeholder="Ex: a1b2c3d4" required>
+          </div>
+
+          <div class="form-group">
+            <label for="join-name">Seu Nome</label>
+            <input type="text" id="join-name" placeholder="Ex: Maria Santos" required>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="join-spectator">
+              Entrar só pra assistir (modo plateia)
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-secondary">Entrar na Mesa</button>
+        </form>
+      </div>
+    </main>
+
+    <footer class="lobby-footer">
+      <p class="footer-brand">Jorbe Guaraná® • Qualidade duvidosa desde 2024 • "Se é do Jorbe, é bom (mais ou menos)"</p>
+      <p class="footer-legal">Nenhum guaraná foi ferido na produção desta ferramenta. Talvez.</p>
+    </footer>
+  </div>
+
+  <script>
+    // Restore saved name
+    const savedName = localStorage.getItem('plannit-poker-name');
+    if (savedName) {
+      document.getElementById('your-name').value = savedName;
+      document.getElementById('join-name').value = savedName;
+    }
+
+    document.getElementById('create-room-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('room-name').value.trim();
+      const moderatorName = document.getElementById('your-name').value.trim();
+      const deck = document.getElementById('deck-type').value;
+      const secret = document.getElementById('room-secret').value;
+      const errorEl = document.getElementById('create-error');
+
+      errorEl.style.display = 'none';
+      localStorage.setItem('plannit-poker-name', moderatorName);
+
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, deck, moderatorName, secret })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        errorEl.textContent = data.error || 'Erro ao criar sala';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      // Save secret for convenience (optional re-use)
+      localStorage.setItem('plannit-poker-secret', secret);
+      localStorage.setItem('plannit-poker-user', moderatorName);
+      window.location.href = data.url;
+    });
+
+    document.getElementById('join-room-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const roomId = document.getElementById('join-room-id').value.trim();
+      const name = document.getElementById('join-name').value.trim();
+      const isSpectator = document.getElementById('join-spectator').checked;
+
+      localStorage.setItem('plannit-poker-name', name);
+      localStorage.setItem('plannit-poker-user', name);
+      if (isSpectator) localStorage.setItem('plannit-poker-spectator', 'true');
+      else localStorage.removeItem('plannit-poker-spectator');
+
+      window.location.href = `/room/${roomId}`;
+    });
+  </script>
+</body>
+</html>

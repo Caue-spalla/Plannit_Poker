@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: jorbe-poker
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ROOM_SECRET
+        sync: false
+      - key: NODE_ENV
+        value: production

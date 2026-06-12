@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jorbe Poker™ - Mesa</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥤</text></svg>">
+</head>
+<body>
+  <!-- Name Modal -->
+  <div id="name-modal" class="modal">
+    <div class="modal-content">
+      <h2>Entrar na Mesa</h2>
+      <form id="name-form">
+        <div class="form-group">
+          <label for="modal-name">Seu Nome</label>
+          <input type="text" id="modal-name" placeholder="Digite seu nome" required autofocus>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="modal-spectator">
+            Entrar como espectador
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Entrar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Room -->
+  <div id="room-app" class="room-container" style="display:none;">
+    <header class="room-header">
+      <div class="room-info">
+        <h1 id="room-name">Sala</h1>
+        <span class="participant-badge" id="participant-count">0 participantes</span>
+      </div>
+      <div class="room-actions">
+        <button class="btn btn-sm btn-outline" id="btn-copy-link" title="Copiar link da sala">
+          📋 Copiar Link
+        </button>
+        <button class="btn btn-sm btn-outline" id="btn-leave" title="Sair da sala">
+          🚪 Sair
+        </button>
+      </div>
+    </header>
+
+    <!-- Story / Issue -->
+    <section class="story-section">
+      <div class="story-display" id="story-display">
+        <span class="story-label">Votando:</span>
+        <span class="story-text" id="story-text">Nenhuma história definida</span>
+      </div>
+      <div class="story-edit" id="story-edit" style="display:none;">
+        <input type="text" id="story-input" placeholder="Descrição da história / issue...">
+        <button class="btn btn-sm btn-primary" id="btn-set-story">Definir</button>
+      </div>
+    </section>
+
+    <!-- Voting Table -->
+    <section class="table-section">
+      <div class="poker-table" id="poker-table">
+        <!-- Participants render here -->
+      </div>
+      
+      <!-- Stats (shown after reveal) -->
+      <div class="stats-panel" id="stats-panel" style="display:none;">
+        <div class="stat">
+          <span class="stat-label">Média</span>
+          <span class="stat-value" id="stat-avg">-</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Mínimo</span>
+          <span class="stat-value" id="stat-min">-</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Máximo</span>
+          <span class="stat-value" id="stat-max">-</span>
+        </div>
+        <div class="stat" id="stat-consensus-wrap" style="display:none;">
+          <span class="stat-label">🎉</span>
+          <span class="stat-value consensus">Consenso!</span>
+        </div>
+      </div>
+
+      <!-- Outliers Panel -->
+      <div class="outliers-panel" id="outliers-panel" style="display:none;">
+        <h4>⚠️ Votos Divergentes</h4>
+        <div class="outliers-list" id="outliers-list"></div>
+        <button class="btn btn-warning btn-sm" id="btn-allow-revote" style="display:none;">
+          🔄 Permitir Revote
+        </button>
+      </div>
+
+      <!-- Revote notice -->
+      <div class="revote-notice" id="revote-notice" style="display:none;">
+        <p>🔄 <strong>Revote permitido!</strong> Altere sua carta abaixo.</p>
+      </div>
+    </section>
+
+    <!-- Moderator Controls -->
+    <section class="controls-section" id="moderator-controls" style="display:none;">
+      <button class="btn btn-accent" id="btn-reveal">👁️ Revelar Votos</button>
+      <button class="btn btn-primary" id="btn-new-round">🔄 Nova Rodada</button>
+    </section>
+
+    <!-- Card Deck -->
+    <section class="deck-section" id="deck-section">
+      <h3>Sua Carta</h3>
+      <div class="card-deck" id="card-deck">
+        <!-- Cards render here -->
+      </div>
+    </section>
+
+    <!-- Participants List -->
+    <aside class="participants-sidebar" id="participants-sidebar">
+      <h3>Participantes</h3>
+      <ul id="participants-list"></ul>
+    </aside>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/room.js"></script>
+</body>
+</html>
