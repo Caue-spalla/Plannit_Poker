@@ -376,6 +376,6 @@ setInterval(() => {
   }
 }, 3600000);
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🥤 Jorbe Poker™ rodando em http://localhost:${PORT} — Guaraná gelado!`);
 });
