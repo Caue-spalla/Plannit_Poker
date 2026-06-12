@@ -309,7 +309,7 @@ function renderTable() {
       card.textContent = state.votes[p.id];
     } else if (state.votes[p.id]) {
       card.classList.add('voted');
-      card.textContent = '✓';
+      card.textContent = '🥤';
     } else {
       card.classList.add('not-voted');
       card.textContent = '?';

@@ -449,8 +449,15 @@ body {
 
 .seat-card.voted {
   background: var(--primary);
-  border-color: var(--primary-light);
+  border-color: var(--accent);
   color: white;
+  box-shadow: 0 0 12px var(--accent-glow), 0 0 24px rgba(245, 184, 0, 0.15);
+  animation: votedGlow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes votedGlow {
+  from { box-shadow: 0 0 8px var(--accent-glow), 0 0 16px rgba(245, 184, 0, 0.1); }
+  to { box-shadow: 0 0 16px var(--accent-glow), 0 0 32px rgba(245, 184, 0, 0.25); }
 }
 
 .seat-card.revealed {
