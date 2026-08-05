@@ -6,11 +6,10 @@ let state = {
   room: null,
   participants: [],
   votes: {},
+  votedIds: [],
   you: null,
   selectedCard: null,
-  revealed: false,
-  revoteMode: false,
-  revoteTargets: []
+  revealed: false
 };
 
 // === DOM Elements ===
@@ -56,7 +55,6 @@ function init() {
   $('#btn-reveal').addEventListener('click', () => socket.emit('reveal'));
   $('#btn-new-round').addEventListener('click', newRound);
   $('#btn-set-story').addEventListener('click', setStory);
-  $('#btn-allow-revote').addEventListener('click', allowRevote);
 
   // Keyboard shortcut
   document.addEventListener('keydown', (e) => {
@@ -75,6 +73,7 @@ socket.on('room-state', (data) => {
   state.room = data.room;
   state.participants = data.participants;
   state.votes = data.votes;
+  state.votedIds = data.votedIds || [];
   state.you = data.you;
   state.revealed = data.room.revealed;
   renderAll();
@@ -100,8 +99,20 @@ socket.on('participant-count', (count) => {
   $('#participant-count').textContent = `${count} participante${count !== 1 ? 's' : ''}`;
 });
 
-socket.on('vote-cast', ({ totalVotes, totalVoters }) => {
+socket.on('vote-cast', ({ oderId, votedIds, isChange, totalVotes, totalVoters }) => {
+  state.votedIds = votedIds;
+  // Mark voted in local state for display
+  if (!state.revealed) {
+    state.votes[oderId] = '✓';
+  }
   renderTable();
+  renderParticipants();
+  
+  // Show toast for vote changes
+  if (isChange && oderId !== state.you?.id) {
+    const p = state.participants.find(p => p.id === oderId);
+    if (p) showToast(`${p.name} alterou o voto`);
+  }
 });
 
 socket.on('votes-revealed', ({ votes, stats }) => {
@@ -109,6 +120,7 @@ socket.on('votes-revealed', ({ votes, stats }) => {
   state.revealed = true;
   state.lastStats = stats;
   renderTable();
+  renderDeck();
   renderStats(stats);
   renderOutliers(stats.outliers || []);
   
@@ -120,18 +132,17 @@ socket.on('votes-revealed', ({ votes, stats }) => {
 
 socket.on('round-reset', ({ story }) => {
   state.votes = {};
+  state.votedIds = [];
   state.revealed = false;
   state.selectedCard = null;
-  state.revoteMode = false;
-  state.revoteTargets = [];
   state.room.currentStory = story;
 
   $('#stats-panel').style.display = 'none';
   $('#outliers-panel').style.display = 'none';
-  $('#revote-notice').style.display = 'none';
   renderTable();
   renderDeck();
   renderStory();
+  renderParticipants();
 
   if (state.you?.isModerator) {
     $('#btn-reveal').style.display = '';
@@ -174,40 +185,6 @@ socket.on('spectator-toggled', ({ targetId, isSpectator, name }) => {
   }
   
   renderAll();
-});
-
-socket.on('revote-allowed', ({ targetIds }) => {
-  state.revoteMode = true;
-  state.revoteTargets = targetIds;
-  
-  // Clear all votes in local state
-  state.votes = {};
-  state.selectedCard = null;
-  
-  if (targetIds.includes(state.you?.id)) {
-    $('#revote-notice').style.display = 'block';
-    showToast('Revote aberto! Escolha sua nova carta.');
-  }
-  
-  renderTable();
-  renderDeck();
-});
-
-socket.on('revote-cast', ({ oderId }) => {
-  state.votes[oderId] = '✓';
-  renderTable();
-});
-
-socket.on('revote-complete', ({ votes, stats }) => {
-  state.votes = votes;
-  state.revoteMode = false;
-  state.revoteTargets = [];
-  $('#revote-notice').style.display = 'none';
-  
-  renderTable();
-  renderStats(stats);
-  renderOutliers(stats.outliers || []);
-  showToast('Revote concluído!');
 });
 
 socket.on('kicked', () => {
@@ -268,9 +245,8 @@ function renderDeck() {
   const container = $('#card-deck');
   container.innerHTML = '';
 
-  // Check if user can vote
-  const canVote = !state.you?.isSpectator && 
-    (!state.revealed || (state.revoteMode && state.revoteTargets.includes(state.you?.id)));
+  // Players can vote/change vote anytime (before or after reveal)
+  const canVote = !state.you?.isSpectator;
 
   deck.forEach(value => {
     const card = document.createElement('div');
@@ -298,16 +274,13 @@ function renderTable() {
     card.className = 'seat-card';
 
     const isOutlier = state.revealed && state.lastStats?.outliers?.some(o => o.oderId === p.id);
-    const isRevoteTarget = state.revoteMode && state.revoteTargets.includes(p.id);
+    const hasVoted = state.votedIds.includes(p.id) || !!state.votes[p.id];
 
-    if (isRevoteTarget && !state.votes[p.id]) {
-      card.classList.add('revoting');
-      card.textContent = '🔄';
-    } else if (state.revealed && state.votes[p.id]) {
+    if (state.revealed && state.votes[p.id]) {
       card.classList.add('revealed');
       if (isOutlier) card.classList.add('outlier');
       card.textContent = state.votes[p.id];
-    } else if (state.votes[p.id]) {
+    } else if (hasVoted) {
       card.classList.add('voted');
       card.textContent = '🥤';
     } else {
@@ -322,10 +295,33 @@ function renderTable() {
     if (isOutlier) name.classList.add('is-outlier');
     name.textContent = p.id === state.you?.id ? `${p.name} (você)` : p.name;
 
+    // Vote status indicator below name
+    const status = document.createElement('div');
+    status.className = 'seat-status';
+    if (state.revealed) {
+      status.textContent = '';
+    } else if (hasVoted) {
+      status.textContent = '✓ Votou';
+      status.classList.add('has-voted');
+    } else {
+      status.textContent = 'Aguardando...';
+      status.classList.add('waiting');
+    }
+
     seat.appendChild(card);
     seat.appendChild(name);
+    seat.appendChild(status);
     container.appendChild(seat);
   });
+
+  // Update vote counter in header
+  const totalVoted = voters.filter(p => state.votedIds.includes(p.id) || !!state.votes[p.id]).length;
+  const totalVoters = voters.length;
+  const counter = $('#vote-counter');
+  if (counter) {
+    counter.textContent = state.revealed ? '' : `${totalVoted}/${totalVoters} votaram`;
+    counter.style.display = state.revealed ? 'none' : 'inline-block';
+  }
 }
 
 function renderParticipants() {
@@ -458,22 +454,100 @@ function renderStats(stats) {
   }
 
   state.lastStats = stats;
+
+  // Detailed stats panel for moderator
+  renderModeratorStats(stats);
+}
+
+function renderModeratorStats(stats) {
+  const panel = $('#mod-stats-panel');
+  if (!panel) return;
+  
+  if (!state.you?.isModerator || !state.revealed) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'block';
+
+  // Indices
+  const indices = $('#mod-stats-indices');
+  indices.innerHTML = `
+    <div class="mod-stat-row">
+      <div class="mod-stat-item">
+        <span class="mod-stat-label">Mediana</span>
+        <span class="mod-stat-value">${stats.median}</span>
+        <span class="mod-stat-hint">Valor central (menos sensível a extremos)</span>
+      </div>
+      <div class="mod-stat-item">
+        <span class="mod-stat-label">Moda</span>
+        <span class="mod-stat-value">${stats.mode ? stats.mode.join(', ') : 'Sem repetição'}</span>
+        <span class="mod-stat-hint">Valor mais votado pelo time</span>
+      </div>
+    </div>
+    <div class="mod-stat-row">
+      <div class="mod-stat-item">
+        <span class="mod-stat-label">Desvio Padrão (σ)</span>
+        <span class="mod-stat-value">${stats.stdDev}</span>
+        <span class="mod-stat-hint">Dispersão dos votos em torno da média — menor = mais alinhado</span>
+      </div>
+      <div class="mod-stat-item">
+        <span class="mod-stat-label">Coef. Variação</span>
+        <span class="mod-stat-value">${stats.cv}%</span>
+        <span class="mod-stat-hint">${parseFloat(stats.cv) < 30 ? '✅ Baixa dispersão' : parseFloat(stats.cv) < 60 ? '⚠️ Dispersão moderada' : '🔴 Alta dispersão'} — compara o desvio relativo à média</span>
+      </div>
+    </div>
+    <div class="mod-stat-row">
+      <div class="mod-stat-item">
+        <span class="mod-stat-label">Intervalo de Confiança (95%)</span>
+        <span class="mod-stat-value">${stats.confidence.low} – ${stats.confidence.high}</span>
+        <span class="mod-stat-hint">Com 95% de confiança, a estimativa real está neste intervalo</span>
+      </div>
+      <div class="mod-stat-item">
+        <span class="mod-stat-label">Índice de Concordância</span>
+        <span class="mod-stat-value">${stats.agreementIndex}%</span>
+        <span class="mod-stat-hint">${parseInt(stats.agreementIndex) > 70 ? '✅ Time alinhado' : parseInt(stats.agreementIndex) > 40 ? '⚠️ Alguma divergência' : '🔴 Muita divergência'} — 100% = consenso total</span>
+      </div>
+    </div>
+  `;
+
+  // Distribution chart
+  const chartContainer = $('#mod-stats-chart');
+  chartContainer.innerHTML = '';
+
+  if (stats.distribution) {
+    const entries = Object.entries(stats.distribution).sort((a, b) => {
+      const numA = parseFloat(a[0]);
+      const numB = parseFloat(b[0]);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a[0].localeCompare(b[0]);
+    });
+    
+    const maxCount = Math.max(...entries.map(e => e[1]));
+
+    entries.forEach(([value, count]) => {
+      const bar = document.createElement('div');
+      bar.className = 'chart-bar-wrap';
+      
+      const pct = (count / maxCount) * 100;
+      bar.innerHTML = `
+        <div class="chart-label">${value}</div>
+        <div class="chart-bar-bg">
+          <div class="chart-bar-fill" style="width: ${pct}%"></div>
+        </div>
+        <div class="chart-count">${count} voto${count > 1 ? 's' : ''}</div>
+      `;
+      chartContainer.appendChild(bar);
+    });
+  }
 }
 
 function renderOutliers(outliers) {
   const panel = $('#outliers-panel');
   const list = $('#outliers-list');
-  const btn = $('#btn-allow-revote');
-
-  // Always show revote button for moderator after reveal
-  if (state.you?.isModerator && state.revealed) {
-    btn.style.display = 'inline-flex';
-  } else {
-    btn.style.display = 'none';
-  }
 
   if (!outliers || outliers.length === 0) {
-    panel.style.display = state.you?.isModerator && state.revealed ? 'block' : 'none';
+    panel.style.display = 'none';
     list.innerHTML = '';
     return;
   }
@@ -504,24 +578,22 @@ function renderOutliers(outliers) {
 function selectCard(value) {
   if (state.you?.isSpectator) return;
   
-  // Normal voting
-  if (!state.revealed && !state.revoteMode) {
-    if (state.selectedCard === value) {
-      state.selectedCard = null;
-      delete state.votes[state.you.id];
-    } else {
-      state.selectedCard = value;
-      state.votes[state.you.id] = '✓';
-      socket.emit('vote', { value });
-    }
+  // Toggle: clicking the same card deselects it
+  if (state.selectedCard === value) {
+    return;
   }
   
-  // Revote mode
-  if (state.revoteMode && state.revoteTargets.includes(state.you?.id)) {
-    state.selectedCard = value;
-    state.votes[state.you.id] = '✓';
-    socket.emit('revote', { value });
+  // Select or change vote (works before and after reveal)
+  state.selectedCard = value;
+  if (!state.votedIds.includes(state.you.id)) {
+    state.votedIds.push(state.you.id);
   }
+  if (!state.revealed) {
+    state.votes[state.you.id] = '✓';
+  } else {
+    state.votes[state.you.id] = value;
+  }
+  socket.emit('vote', { value });
 
   renderDeck();
   renderTable();
@@ -536,10 +608,6 @@ function newRound() {
 function setStory() {
   const story = $('#story-input').value.trim();
   socket.emit('update-story', { story });
-}
-
-function allowRevote() {
-  socket.emit('allow-revote');
 }
 
 function copyLink() {

@@ -51,8 +51,6 @@ app.post('/api/rooms', express.json(), (req, res) => {
     participants: new Map(),
     votes: new Map(),
     revealed: false,
-    revoteAllowed: false,
-    revoteTargets: [],
     currentStory: '',
     createdAt: Date.now()
   });
@@ -83,24 +81,64 @@ app.get('/room/:id', (req, res) => {
 // Compute stats with outlier detection
 function computeStats(numericVotes, allVotes, room) {
   if (numericVotes.length === 0) {
-    return { average: '-', min: '-', max: '-', consensus: false, outliers: [] };
+    return { average: '-', median: '-', mode: '-', min: '-', max: '-', stdDev: '-', consensus: false, outliers: [], distribution: {}, confidence: '-', agreementIndex: '-', totalVoters: 0 };
   }
 
-  const avg = numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length;
-  const min = Math.min(...numericVotes);
-  const max = Math.max(...numericVotes);
+  const sorted = [...numericVotes].sort((a, b) => a - b);
+  const n = sorted.length;
+  
+  const avg = numericVotes.reduce((a, b) => a + b, 0) / n;
+  const min = sorted[0];
+  const max = sorted[n - 1];
   const consensus = new Set(numericVotes).size === 1;
 
-  // Outlier detection: votes that deviate more than 1 standard deviation from mean
-  const stdDev = Math.sqrt(
-    numericVotes.reduce((sum, v) => sum + Math.pow(v - avg, 2), 0) / numericVotes.length
-  );
-  const threshold = Math.max(stdDev * 1.2, avg * 0.3); // At least 30% from average
+  // Median
+  const median = n % 2 === 0 
+    ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 
+    : sorted[Math.floor(n / 2)];
 
+  // Mode (most frequent value)
+  const freq = {};
+  numericVotes.forEach(v => { freq[v] = (freq[v] || 0) + 1; });
+  const maxFreq = Math.max(...Object.values(freq));
+  const modes = Object.keys(freq).filter(k => freq[k] === maxFreq).map(Number);
+  const mode = modes.length === n ? null : modes; // null if all unique
+
+  // Standard deviation
+  const variance = numericVotes.reduce((sum, v) => sum + Math.pow(v - avg, 2), 0) / n;
+  const stdDev = Math.sqrt(variance);
+
+  // Coefficient of variation (dispersion relative to mean)
+  const cv = avg !== 0 ? (stdDev / avg) * 100 : 0;
+
+  // 95% confidence interval (t-distribution approximation for small samples)
+  const standardError = stdDev / Math.sqrt(n);
+  const tValue = n <= 2 ? 12.71 : n <= 5 ? 2.78 : n <= 10 ? 2.26 : n <= 20 ? 2.09 : 1.96;
+  const ciLow = avg - tValue * standardError;
+  const ciHigh = avg + tValue * standardError;
+
+  // Distribution (count per value from all votes including non-numeric)
+  const distribution = {};
+  Object.values(allVotes).forEach(v => {
+    distribution[v] = (distribution[v] || 0) + 1;
+  });
+
+  // Agreement index (1 - normalized entropy): 1 = full consensus, 0 = max spread
+  const totalVotes = Object.values(distribution).reduce((a, b) => a + b, 0);
+  let entropy = 0;
+  Object.values(distribution).forEach(count => {
+    const p = count / totalVotes;
+    if (p > 0) entropy -= p * Math.log2(p);
+  });
+  const maxEntropy = Math.log2(totalVotes);
+  const agreementIndex = maxEntropy > 0 ? 1 - (entropy / maxEntropy) : 1;
+
+  // Outlier detection
+  const threshold = Math.max(stdDev * 1.2, avg * 0.3);
   const outliers = [];
   for (const [oderId, vote] of Object.entries(allVotes)) {
     const num = parseFloat(vote);
-    if (!isNaN(num) && Math.abs(num - avg) > threshold && numericVotes.length > 2) {
+    if (!isNaN(num) && Math.abs(num - avg) > threshold && n > 2) {
       const participant = room.participants.get(oderId);
       outliers.push({
         oderId,
@@ -113,10 +151,18 @@ function computeStats(numericVotes, allVotes, room) {
 
   return {
     average: avg.toFixed(1),
+    median: median % 1 === 0 ? median : median.toFixed(1),
+    mode,
     min,
     max,
+    stdDev: stdDev.toFixed(2),
+    cv: cv.toFixed(1),
+    confidence: { low: Math.max(0, ciLow).toFixed(1), high: ciHigh.toFixed(1) },
     consensus,
-    outliers
+    outliers,
+    distribution,
+    agreementIndex: (agreementIndex * 100).toFixed(0),
+    totalVoters: n
   };
 }
 
@@ -133,11 +179,13 @@ io.on('connection', (socket) => {
     }
 
     currentRoom = roomId;
+    const isModerator = room.participants.size === 0 && !room.moderator;
+    
     currentUser = {
       id: socket.id,
       name: userName,
-      isSpectator,
-      isModerator: room.participants.size === 0 && !room.moderator
+      isSpectator: isModerator ? true : isSpectator,  // Host always enters as spectator
+      isModerator
     };
 
     // First person to join becomes moderator
@@ -165,6 +213,7 @@ io.on('connection', (socket) => {
         : Object.fromEntries(
             Array.from(room.votes.entries()).map(([id]) => [id, '✓'])
           ),
+      votedIds: Array.from(room.votes.keys()),
       you: currentUser
     });
 
@@ -176,17 +225,62 @@ io.on('connection', (socket) => {
   socket.on('vote', ({ value }) => {
     if (!currentRoom || !currentUser) return;
     const room = rooms.get(currentRoom);
-    if (!room || room.revealed || currentUser.isSpectator) return;
+    if (!room || currentUser.isSpectator) return;
 
+    const hadVote = room.votes.has(socket.id);
     room.votes.set(socket.id, value);
     
-    // Notify all that someone voted (but not the value)
-    io.to(currentRoom).emit('vote-cast', {
-      oderId: socket.id,
-      totalVotes: room.votes.size,
-      totalVoters: Array.from(room.participants.values())
-        .filter(p => !p.isSpectator).length
-    });
+    // Build list of who has voted (IDs only, no values)
+    const votedIds = Array.from(room.votes.keys());
+    
+    // Check if all voters have voted (auto-reveal)
+    const totalVoters = Array.from(room.participants.values())
+      .filter(p => !p.isSpectator).length;
+    const allVoted = room.votes.size >= totalVoters && totalVoters > 0;
+
+    // If votes are already revealed, broadcast the updated values + stats
+    if (room.revealed) {
+      const votes = Object.fromEntries(room.votes);
+      const numericVotes = Object.values(votes)
+        .map(v => parseFloat(v))
+        .filter(v => !isNaN(v));
+      const stats = computeStats(numericVotes, votes, room);
+
+      io.to(currentRoom).emit('votes-revealed', { votes, stats });
+      io.to(currentRoom).emit('vote-cast', {
+        oderId: socket.id,
+        votedIds,
+        isChange: hadVote,
+        totalVotes: room.votes.size,
+        totalVoters
+      });
+    } else if (allVoted) {
+      // Auto-reveal when everyone has voted
+      room.revealed = true;
+      const votes = Object.fromEntries(room.votes);
+      const numericVotes = Object.values(votes)
+        .map(v => parseFloat(v))
+        .filter(v => !isNaN(v));
+      const stats = computeStats(numericVotes, votes, room);
+
+      io.to(currentRoom).emit('vote-cast', {
+        oderId: socket.id,
+        votedIds,
+        isChange: hadVote,
+        totalVotes: room.votes.size,
+        totalVoters
+      });
+      io.to(currentRoom).emit('votes-revealed', { votes, stats });
+    } else {
+      // Notify all: who voted + counts (allows real-time tracking)
+      io.to(currentRoom).emit('vote-cast', {
+        oderId: socket.id,
+        votedIds,
+        isChange: hadVote,
+        totalVotes: room.votes.size,
+        totalVoters
+      });
+    }
   });
 
   socket.on('reveal', () => {
@@ -214,8 +308,6 @@ io.on('connection', (socket) => {
 
     room.votes.clear();
     room.revealed = false;
-    room.revoteAllowed = false;
-    room.revoteTargets = [];
     room.currentStory = story;
 
     io.to(currentRoom).emit('round-reset', { story });
@@ -287,50 +379,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('allow-revote', () => {
-    if (!currentRoom || !currentUser) return;
-    const room = rooms.get(currentRoom);
-    if (!room || !currentUser.isModerator || !room.revealed) return;
 
-    room.revoteAllowed = true;
-    // All non-spectator participants can revote
-    const allVoters = Array.from(room.participants.values())
-      .filter(p => !p.isSpectator)
-      .map(p => p.id);
-    room.revoteTargets = allVoters;
-
-    // Clear all votes
-    room.votes.clear();
-
-    io.to(currentRoom).emit('revote-allowed', { targetIds: allVoters });
-  });
-
-  socket.on('revote', ({ value }) => {
-    if (!currentRoom || !currentUser) return;
-    const room = rooms.get(currentRoom);
-    if (!room || !room.revoteAllowed) return;
-    if (!room.revoteTargets.includes(socket.id)) return;
-
-    room.votes.set(socket.id, value);
-
-    // Check if all targets have revoted
-    const allRevoted = room.revoteTargets.every(id => room.votes.has(id));
-    
-    if (allRevoted) {
-      room.revoteAllowed = false;
-      const votes = Object.fromEntries(room.votes);
-      
-      const numericVotes = Object.values(votes)
-        .map(v => parseFloat(v))
-        .filter(v => !isNaN(v));
-      
-      const stats = computeStats(numericVotes, votes, room);
-
-      io.to(currentRoom).emit('revote-complete', { votes, stats });
-    } else {
-      io.to(currentRoom).emit('revote-cast', { oderId: socket.id });
-    }
-  });
 
   socket.on('disconnect', () => {
     if (!currentRoom) return;

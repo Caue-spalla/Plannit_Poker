@@ -34,6 +34,7 @@
       <div class="room-info">
         <h1 id="room-name">Sala</h1>
         <span class="participant-badge" id="participant-count">0 participantes</span>
+        <span class="vote-counter" id="vote-counter"></span>
       </div>
       <div class="room-actions">
         <button class="btn btn-sm btn-outline" id="btn-copy-link" title="Copiar link da sala">
@@ -87,14 +88,19 @@
       <div class="outliers-panel" id="outliers-panel" style="display:none;">
         <h4>⚠️ Votos Divergentes</h4>
         <div class="outliers-list" id="outliers-list"></div>
-        <button class="btn btn-warning btn-sm" id="btn-allow-revote" style="display:none;">
-          🔄 Permitir Revote
-        </button>
       </div>
 
-      <!-- Revote notice -->
-      <div class="revote-notice" id="revote-notice" style="display:none;">
-        <p>🔄 <strong>Revote permitido!</strong> Altere sua carta abaixo.</p>
+      <!-- Moderator Detailed Stats -->
+      <div class="mod-stats-panel" id="mod-stats-panel" style="display:none;">
+        <h4>📊 Análise Detalhada <span class="mod-stats-badge">Visível só para o moderador</span></h4>
+        <div class="mod-stats-section">
+          <h5>Índices Estatísticos</h5>
+          <div id="mod-stats-indices"></div>
+        </div>
+        <div class="mod-stats-section">
+          <h5>Distribuição dos Votos</h5>
+          <div class="mod-stats-chart" id="mod-stats-chart"></div>
+        </div>
       </div>
     </section>
 

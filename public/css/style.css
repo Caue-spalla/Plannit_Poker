@@ -893,3 +893,181 @@ body {
   color: var(--accent) !important;
   font-weight: 600;
 }
+
+
+/* === Vote Counter (Header) === */
+.vote-counter {
+  background: var(--primary);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: white;
+  font-weight: 700;
+  border: 1px solid var(--primary-light);
+}
+
+/* === Seat Status Indicator === */
+.seat-status {
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 2px;
+  letter-spacing: 0.3px;
+}
+
+.seat-status.has-voted {
+  color: var(--success);
+}
+
+.seat-status.waiting {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* === Outlier Card Highlight === */
+.seat-card.outlier {
+  border-color: var(--accent) !important;
+  background: rgba(245, 184, 0, 0.1) !important;
+  color: var(--accent) !important;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.seat-name.is-outlier {
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+
+
+/* === Moderator Detailed Stats Panel === */
+.mod-stats-panel {
+  margin-top: 20px;
+  padding: 20px 24px;
+  background: var(--bg-card);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius);
+  max-width: 700px;
+  width: 100%;
+}
+
+.mod-stats-panel h4 {
+  font-size: 15px;
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mod-stats-badge {
+  font-size: 10px;
+  background: rgba(45, 140, 60, 0.2);
+  color: var(--primary-light);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.mod-stats-section {
+  margin-bottom: 20px;
+}
+
+.mod-stats-section:last-child {
+  margin-bottom: 0;
+}
+
+.mod-stats-section h5 {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mod-stat-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 600px) {
+  .mod-stat-row { grid-template-columns: 1fr; }
+}
+
+.mod-stat-item {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+}
+
+.mod-stat-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.mod-stat-value {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.mod-stat-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  font-style: italic;
+}
+
+/* Distribution Chart */
+.mod-stats-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chart-bar-wrap {
+  display: grid;
+  grid-template-columns: 40px 1fr 60px;
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: right;
+}
+
+.chart-bar-bg {
+  height: 24px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.chart-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-light));
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  min-width: 4px;
+}
+
+.chart-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
