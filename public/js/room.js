@@ -79,8 +79,6 @@ function setupModalAvatar() {
   const clearBtn = $('#modal-avatar-clear');
   if (!input || !preview) return;
 
-  const MAX = 200 * 1024;
-
   function refresh() {
     const avatar = localStorage.getItem('plannit-poker-avatar');
     if (avatar) {
@@ -96,42 +94,15 @@ function setupModalAvatar() {
     }
   }
 
-  function process(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const size = 128;
-          const canvas = document.createElement('canvas');
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          const min = Math.min(img.width, img.height);
-          const sx = (img.width - min) / 2;
-          const sy = (img.height - min) / 2;
-          ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-          if (dataUrl.length > MAX * 1.4) reject(new Error('Imagem muito grande. Tente uma menor.'));
-          else resolve(dataUrl);
-        };
-        img.onerror = () => reject(new Error('Arquivo de imagem inválido.'));
-        img.src = reader.result;
-      };
-      reader.onerror = () => reject(new Error('Não consegui ler o arquivo.'));
-      reader.readAsDataURL(file);
-    });
-  }
-
   input.addEventListener('change', async () => {
     const file = input.files[0];
     if (!file) return;
     try {
-      const dataUrl = await process(file);
+      const dataUrl = await openAvatarCropper(file);
       localStorage.setItem('plannit-poker-avatar', dataUrl);
       refresh();
     } catch (err) {
-      alert(err.message);
+      if (err && err.message !== 'cancelado') alert(err.message);
       input.value = '';
     }
   });
@@ -439,7 +410,7 @@ function renderParticipants() {
     const li = document.createElement('li');
     li.className = 'participant-card';
 
-    // Top row: avatar + name + badges
+    // Top row: avatar + name (badges go on their own row below)
     const top = document.createElement('div');
     top.className = 'participant-top';
 
@@ -498,8 +469,10 @@ function renderParticipants() {
     }
 
     top.appendChild(info);
-    top.appendChild(badges);
     li.appendChild(top);
+    if (badges.childNodes.length > 0) {
+      li.appendChild(badges);
+    }
 
     // Moderator actions
     if (state.you?.isModerator && p.id !== state.you.id) {

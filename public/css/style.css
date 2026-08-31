@@ -678,21 +678,20 @@ body {
 .participant-top {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .participant-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
   flex: 1;
 }
 
 .participant-avatar {
-  width: 34px;
-  height: 34px;
+  width: 52px;
+  height: 52px;
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--bg);
@@ -701,10 +700,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--accent);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
 }
 
 .participant-avatar.has-image {
@@ -713,7 +712,8 @@ body {
 }
 
 .participant-name {
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -852,6 +852,116 @@ body {
 .avatar-clear:hover {
   background: var(--danger);
   color: white;
+}
+
+/* === Avatar Cropper Modal === */
+.cropper-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 10, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+}
+
+.cropper-content {
+  background: var(--bg-card);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 90%;
+  max-width: 340px;
+  text-align: center;
+}
+
+.cropper-content h3 {
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.cropper-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.cropper-stage {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  margin: 0 auto 16px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.cropper-canvas {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.cropper-canvas:active {
+  cursor: grabbing;
+}
+
+/* Círculo indicando a área que será usada */
+.cropper-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  box-shadow: 0 0 0 9999px rgba(10, 20, 10, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+}
+
+.cropper-zoom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.cropper-zoom-range {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.cropper-preview-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.cropper-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--bg);
+  border: 2px solid var(--accent);
+}
+
+.cropper-preview-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cropper-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.cropper-actions .btn {
+  flex: 1;
 }
 
 /* Toast */
