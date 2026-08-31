@@ -31,8 +31,17 @@ const DECKS = {
   hours_sequential: hoursSequential
 };
 
+// Validate/limit avatar: accept only image data URLs up to ~200KB, otherwise drop it
+const MAX_AVATAR_LENGTH = 280000; // ~200KB em base64
+function sanitizeAvatar(avatar) {
+  if (typeof avatar !== 'string') return null;
+  if (!/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(avatar)) return null;
+  if (avatar.length > MAX_AVATAR_LENGTH) return null;
+  return avatar;
+}
+
 // API: Create room
-app.post('/api/rooms', express.json(), (req, res) => {
+app.post('/api/rooms', express.json({ limit: '1mb' }), (req, res) => {
   const { name, deck = 'fibonacci', moderatorName, secret } = req.body;
 
   if (!secret || secret !== ROOM_SECRET) {
@@ -172,7 +181,7 @@ io.on('connection', (socket) => {
   let currentRoom = null;
   let currentUser = null;
 
-  socket.on('join-room', ({ roomId, userName, isSpectator = false }) => {
+  socket.on('join-room', ({ roomId, userName, isSpectator = false, avatar = null }) => {
     const room = rooms.get(roomId);
     if (!room) {
       socket.emit('error', { message: 'Sala não encontrada' });
@@ -185,6 +194,7 @@ io.on('connection', (socket) => {
     currentUser = {
       id: socket.id,
       name: userName,
+      avatar: sanitizeAvatar(avatar),
       isSpectator: isModerator ? true : isSpectator,  // Host always enters as spectator
       isModerator
     };

@@ -22,6 +22,8 @@ function init() {
   const savedName = localStorage.getItem('plannit-poker-user');
   const isSpectator = localStorage.getItem('plannit-poker-spectator') === 'true';
 
+  setupModalAvatar();
+
   if (savedName) {
     joinRoom(savedName, isSpectator);
     $('#name-modal').style.display = 'none';
@@ -66,7 +68,83 @@ function init() {
 }
 
 function joinRoom(userName, isSpectator) {
-  socket.emit('join-room', { roomId, userName, isSpectator });
+  const avatar = localStorage.getItem('plannit-poker-avatar') || null;
+  socket.emit('join-room', { roomId, userName, isSpectator, avatar });
+}
+
+// Avatar picker inside the room's name modal (for users who land directly on the room URL)
+function setupModalAvatar() {
+  const input = $('#modal-avatar');
+  const preview = $('#modal-avatar-preview');
+  const clearBtn = $('#modal-avatar-clear');
+  if (!input || !preview) return;
+
+  const MAX = 200 * 1024;
+
+  function refresh() {
+    const avatar = localStorage.getItem('plannit-poker-avatar');
+    if (avatar) {
+      preview.style.backgroundImage = `url(${avatar})`;
+      preview.classList.add('has-image');
+      preview.textContent = '';
+      if (clearBtn) clearBtn.style.display = '';
+    } else {
+      preview.style.backgroundImage = '';
+      preview.classList.remove('has-image');
+      preview.textContent = '🙂';
+      if (clearBtn) clearBtn.style.display = 'none';
+    }
+  }
+
+  function process(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const size = 128;
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const min = Math.min(img.width, img.height);
+          const sx = (img.width - min) / 2;
+          const sy = (img.height - min) / 2;
+          ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          if (dataUrl.length > MAX * 1.4) reject(new Error('Imagem muito grande. Tente uma menor.'));
+          else resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('Arquivo de imagem inválido.'));
+        img.src = reader.result;
+      };
+      reader.onerror = () => reject(new Error('Não consegui ler o arquivo.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await process(file);
+      localStorage.setItem('plannit-poker-avatar', dataUrl);
+      refresh();
+    } catch (err) {
+      alert(err.message);
+      input.value = '';
+    }
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      localStorage.removeItem('plannit-poker-avatar');
+      input.value = '';
+      refresh();
+    });
+  }
+
+  refresh();
 }
 
 // === Socket Events ===
@@ -359,13 +437,23 @@ function renderParticipants() {
 
   state.participants.forEach(p => {
     const li = document.createElement('li');
-    
+    li.className = 'participant-card';
+
+    // Top row: avatar + name + badges
+    const top = document.createElement('div');
+    top.className = 'participant-top';
+
     const info = document.createElement('div');
     info.className = 'participant-info';
     
     const avatar = document.createElement('div');
     avatar.className = 'participant-avatar';
-    avatar.textContent = p.name.charAt(0).toUpperCase();
+    if (p.avatar) {
+      avatar.classList.add('has-image');
+      avatar.style.backgroundImage = `url(${p.avatar})`;
+    } else {
+      avatar.textContent = p.name.charAt(0).toUpperCase();
+    }
     
     const nameSpan = document.createElement('span');
     nameSpan.className = 'participant-name';
@@ -409,8 +497,9 @@ function renderParticipants() {
       badges.appendChild(badge);
     }
 
-    li.appendChild(info);
-    li.appendChild(badges);
+    top.appendChild(info);
+    top.appendChild(badges);
+    li.appendChild(top);
 
     // Moderator actions
     if (state.you?.isModerator && p.id !== state.you.id) {

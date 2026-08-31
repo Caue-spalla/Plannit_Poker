@@ -653,50 +653,78 @@ body {
 
 #participants-list {
   list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-#participants-list li {
+/* Card per user */
+#participants-list li.participant-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+#participants-list li.participant-card:hover {
+  border-color: var(--accent);
+}
+
+.participant-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 4px;
-  font-size: 13px;
-  transition: background 0.2s;
-}
-
-#participants-list li:hover {
-  background: var(--bg-elevated);
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .participant-info {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 
 .participant-avatar {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
   border-radius: 50%;
-  background: var(--bg-elevated);
+  background: var(--bg);
+  background-size: cover;
+  background-position: center;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--accent);
   border: 1px solid var(--border);
 }
 
+.participant-avatar.has-image {
+  color: transparent;
+  border-color: var(--accent);
+}
+
 .participant-name {
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .participant-badges {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .badge {
@@ -731,28 +759,27 @@ body {
   color: var(--accent);
 }
 
-/* Moderator actions on participants */
+/* Moderator actions on participants — own row inside the card */
 .mod-actions {
-  display: none;
-  gap: 4px;
-}
-
-.room-container.is-moderator #participants-list li:hover .mod-actions {
   display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }
 
 .mod-action-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: none;
-  background: var(--bg);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
   color: var(--text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 13px;
   transition: all 0.2s;
 }
 
@@ -778,6 +805,53 @@ body {
 
 .mod-actions-self {
   display: flex !important;
+}
+
+/* Avatar picker (create/join forms + name modal) */
+.avatar-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar-preview {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.avatar-preview.has-image {
+  border-color: var(--accent);
+}
+
+.avatar-btn {
+  cursor: pointer;
+}
+
+.avatar-clear {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.avatar-clear:hover {
+  background: var(--danger);
+  color: white;
 }
 
 /* Toast */

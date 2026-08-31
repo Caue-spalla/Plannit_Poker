@@ -31,6 +31,18 @@
           </div>
 
           <div class="form-group">
+            <label>Sua Foto (opcional)</label>
+            <div class="avatar-picker">
+              <div class="avatar-preview" id="create-avatar-preview">🙂</div>
+              <label class="btn btn-sm btn-outline avatar-btn">
+                📷 Escolher imagem
+                <input type="file" id="create-avatar" accept="image/*" hidden>
+              </label>
+              <button type="button" class="avatar-clear" id="create-avatar-clear" style="display:none;" title="Remover imagem">✕</button>
+            </div>
+          </div>
+
+          <div class="form-group">
             <label for="deck-type">Tipo de Deck</label>
             <select id="deck-type">
               <option value="fibonacci">Fibonacci (0, 1, 2, 3, 5, 8, 13, 21...)</option>
@@ -67,6 +79,18 @@
           </div>
 
           <div class="form-group">
+            <label>Sua Foto (opcional)</label>
+            <div class="avatar-picker">
+              <div class="avatar-preview" id="join-avatar-preview">🙂</div>
+              <label class="btn btn-sm btn-outline avatar-btn">
+                📷 Escolher imagem
+                <input type="file" id="join-avatar" accept="image/*" hidden>
+              </label>
+              <button type="button" class="avatar-clear" id="join-avatar-clear" style="display:none;" title="Remover imagem">✕</button>
+            </div>
+          </div>
+
+          <div class="form-group">
             <label class="checkbox-label">
               <input type="checkbox" id="join-spectator">
               Entrar só pra assistir (modo plateia)
@@ -91,6 +115,96 @@
       document.getElementById('your-name').value = savedName;
       document.getElementById('join-name').value = savedName;
     }
+
+    // === Avatar handling ===
+    const MAX_AVATAR_BYTES = 200 * 1024; // 200KB após redimensionar
+    let selectedAvatar = localStorage.getItem('plannit-poker-avatar') || null;
+
+    // Downscale the chosen image to a small square dataURL to keep it lightweight
+    function processAvatarFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const size = 128;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            // Center-crop to a square
+            const min = Math.min(img.width, img.height);
+            const sx = (img.width - min) / 2;
+            const sy = (img.height - min) / 2;
+            ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            if (dataUrl.length > MAX_AVATAR_BYTES * 1.4) {
+              reject(new Error('Imagem muito grande. Tente uma menor.'));
+            } else {
+              resolve(dataUrl);
+            }
+          };
+          img.onerror = () => reject(new Error('Arquivo de imagem inválido.'));
+          img.src = reader.result;
+        };
+        reader.onerror = () => reject(new Error('Não consegui ler o arquivo.'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function setupAvatarPicker(inputId, previewId, clearId) {
+      const input = document.getElementById(inputId);
+      const preview = document.getElementById(previewId);
+      const clearBtn = document.getElementById(clearId);
+
+      function refreshPreview() {
+        if (selectedAvatar) {
+          preview.style.backgroundImage = `url(${selectedAvatar})`;
+          preview.classList.add('has-image');
+          preview.textContent = '';
+          clearBtn.style.display = '';
+        } else {
+          preview.style.backgroundImage = '';
+          preview.classList.remove('has-image');
+          preview.textContent = '🙂';
+          clearBtn.style.display = 'none';
+        }
+      }
+
+      input.addEventListener('change', async () => {
+        const file = input.files[0];
+        if (!file) return;
+        try {
+          selectedAvatar = await processAvatarFile(file);
+          localStorage.setItem('plannit-poker-avatar', selectedAvatar);
+          // Keep both pickers in sync
+          syncAllPreviews();
+        } catch (err) {
+          alert(err.message);
+          input.value = '';
+        }
+      });
+
+      clearBtn.addEventListener('click', () => {
+        selectedAvatar = null;
+        localStorage.removeItem('plannit-poker-avatar');
+        input.value = '';
+        syncAllPreviews();
+      });
+
+      preview._refresh = refreshPreview;
+      refreshPreview();
+    }
+
+    function syncAllPreviews() {
+      ['create-avatar-preview', 'join-avatar-preview'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el._refresh) el._refresh();
+      });
+    }
+
+    setupAvatarPicker('create-avatar', 'create-avatar-preview', 'create-avatar-clear');
+    setupAvatarPicker('join-avatar', 'join-avatar-preview', 'join-avatar-clear');
 
     document.getElementById('create-room-form').addEventListener('submit', async (e) => {
       e.preventDefault();

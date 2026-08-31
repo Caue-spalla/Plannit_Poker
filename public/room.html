@@ -18,6 +18,17 @@
           <input type="text" id="modal-name" placeholder="Digite seu nome" required autofocus>
         </div>
         <div class="form-group">
+          <label>Sua Foto (opcional)</label>
+          <div class="avatar-picker">
+            <div class="avatar-preview" id="modal-avatar-preview">🙂</div>
+            <label class="btn btn-sm btn-outline avatar-btn">
+              📷 Escolher imagem
+              <input type="file" id="modal-avatar" accept="image/*" hidden>
+            </label>
+            <button type="button" class="avatar-clear" id="modal-avatar-clear" style="display:none;" title="Remover imagem">✕</button>
+          </div>
+        </div>
+        <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" id="modal-spectator">
             Entrar como espectador
