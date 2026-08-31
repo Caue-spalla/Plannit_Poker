@@ -726,6 +726,11 @@ body {
   color: var(--primary-light);
 }
 
+.badge-can-edit {
+  background: rgba(245, 184, 0, 0.18);
+  color: var(--accent);
+}
+
 /* Moderator actions on participants */
 .mod-actions {
   display: none;
@@ -759,6 +764,16 @@ body {
 .toggle-spectator-btn:hover {
   background: var(--primary) !important;
   color: white !important;
+}
+
+.edit-permission-btn:hover {
+  background: var(--accent) !important;
+  color: white !important;
+}
+
+.edit-permission-btn.active {
+  background: rgba(245, 184, 0, 0.2);
+  color: var(--accent);
 }
 
 .mod-actions-self {

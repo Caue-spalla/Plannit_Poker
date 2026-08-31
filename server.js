@@ -51,6 +51,7 @@ app.post('/api/rooms', express.json(), (req, res) => {
     participants: new Map(),
     votes: new Map(),
     revealed: false,
+    editAfterReveal: new Set(), // socketIds liberados a alterar o voto após revelar
     currentStory: '',
     createdAt: Date.now()
   });
@@ -214,6 +215,7 @@ io.on('connection', (socket) => {
             Array.from(room.votes.entries()).map(([id]) => [id, '✓'])
           ),
       votedIds: Array.from(room.votes.keys()),
+      editableIds: Array.from(room.editAfterReveal),
       you: currentUser
     });
 
@@ -226,6 +228,14 @@ io.on('connection', (socket) => {
     if (!currentRoom || !currentUser) return;
     const room = rooms.get(currentRoom);
     if (!room || currentUser.isSpectator) return;
+
+    // Após o reveal, só quem foi liberado pelo moderador (ou o próprio moderador) pode alterar o voto
+    if (room.revealed && !currentUser.isModerator && !room.editAfterReveal.has(socket.id)) {
+      socket.emit('edit-denied', {
+        message: 'O moderador não liberou você para alterar o voto após revelar.'
+      });
+      return;
+    }
 
     const hadVote = room.votes.has(socket.id);
     room.votes.set(socket.id, value);
@@ -308,6 +318,7 @@ io.on('connection', (socket) => {
 
     room.votes.clear();
     room.revealed = false;
+    room.editAfterReveal.clear();
     room.currentStory = story;
 
     io.to(currentRoom).emit('round-reset', { story });
@@ -353,6 +364,7 @@ io.on('connection', (socket) => {
     
     room.participants.delete(targetId);
     room.votes.delete(targetId);
+    room.editAfterReveal.delete(targetId);
     io.to(currentRoom).emit('participant-left', { id: targetId });
     io.to(currentRoom).emit('participant-count', room.participants.size);
   });
@@ -372,10 +384,38 @@ io.on('connection', (socket) => {
       room.votes.delete(targetId);
     }
 
+    // Se virou espectador, também perde a liberação de edição pós-reveal
+    if (target.isSpectator) {
+      room.editAfterReveal.delete(targetId);
+    }
+
     io.to(currentRoom).emit('spectator-toggled', { 
       targetId, 
       isSpectator: target.isSpectator,
       name: target.name 
+    });
+  });
+
+  socket.on('toggle-edit-permission', ({ targetId }) => {
+    if (!currentRoom || !currentUser) return;
+    const room = rooms.get(currentRoom);
+    if (!room || !currentUser.isModerator) return;
+
+    const target = room.participants.get(targetId);
+    if (!target || target.isSpectator) return;
+
+    const allowed = !room.editAfterReveal.has(targetId);
+    if (allowed) {
+      room.editAfterReveal.add(targetId);
+    } else {
+      room.editAfterReveal.delete(targetId);
+    }
+
+    io.to(currentRoom).emit('edit-permission-changed', {
+      targetId,
+      canEditAfterReveal: allowed,
+      name: target.name,
+      editableIds: Array.from(room.editAfterReveal)
     });
   });
 
@@ -388,6 +428,7 @@ io.on('connection', (socket) => {
 
     room.participants.delete(socket.id);
     room.votes.delete(socket.id);
+    room.editAfterReveal.delete(socket.id);
 
     // Transfer moderator if needed
     if (room.moderator === socket.id && room.participants.size > 0) {

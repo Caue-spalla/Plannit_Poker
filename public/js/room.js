@@ -7,6 +7,7 @@ let state = {
   participants: [],
   votes: {},
   votedIds: [],
+  editableIds: [],
   you: null,
   selectedCard: null,
   revealed: false
@@ -74,6 +75,7 @@ socket.on('room-state', (data) => {
   state.participants = data.participants;
   state.votes = data.votes;
   state.votedIds = data.votedIds || [];
+  state.editableIds = data.editableIds || [];
   state.you = data.you;
   state.revealed = data.room.revealed;
   renderAll();
@@ -123,6 +125,7 @@ socket.on('votes-revealed', ({ votes, stats }) => {
   renderDeck();
   renderStats(stats);
   renderOutliers(stats.outliers || []);
+  renderParticipants();
   
   if (state.you?.isModerator) {
     $('#btn-reveal').style.display = 'none';
@@ -187,6 +190,32 @@ socket.on('spectator-toggled', ({ targetId, isSpectator, name }) => {
   renderAll();
 });
 
+socket.on('edit-permission-changed', ({ targetId, canEditAfterReveal, name, editableIds }) => {
+  state.editableIds = editableIds || [];
+
+  if (targetId === state.you?.id) {
+    if (canEditAfterReveal) {
+      showToast('✏️ O moderador liberou você para alterar o voto após revelar.');
+    } else {
+      showToast('🔒 O moderador bloqueou a alteração do seu voto após revelar.');
+      // Se estava com uma carta em edição pós-reveal, reflete o valor já registrado
+      if (state.revealed) state.selectedCard = state.votes[state.you.id] ?? null;
+    }
+  } else if (state.you?.isModerator) {
+    showToast(`${name} ${canEditAfterReveal ? 'liberado' : 'bloqueado'} para editar após revelar`);
+  }
+
+  renderDeck();
+  renderParticipants();
+});
+
+socket.on('edit-denied', ({ message }) => {
+  showToast(`🔒 ${message}`);
+  // Ressincroniza a carta selecionada com o voto de fato registrado
+  state.selectedCard = state.votes[state.you?.id] ?? null;
+  renderDeck();
+});
+
 socket.on('kicked', () => {
   alert('Você foi removido da sala pelo moderador.');
   window.location.href = '/';
@@ -245,8 +274,8 @@ function renderDeck() {
   const container = $('#card-deck');
   container.innerHTML = '';
 
-  // Players can vote/change vote anytime (before or after reveal)
-  const canVote = !state.you?.isSpectator;
+  // Before reveal: anyone (non-spectator) votes. After reveal: só moderador ou liberados.
+  const canVote = canChangeVote();
 
   deck.forEach(value => {
     const card = document.createElement('div');
@@ -372,6 +401,13 @@ function renderParticipants() {
       badge.textContent = '✓';
       badges.appendChild(badge);
     }
+    if (state.revealed && !p.isSpectator && state.editableIds.includes(p.id)) {
+      const badge = document.createElement('span');
+      badge.className = 'badge badge-can-edit';
+      badge.title = 'Liberado para alterar o voto após revelar';
+      badge.textContent = '✏️';
+      badges.appendChild(badge);
+    }
 
     li.appendChild(info);
     li.appendChild(badges);
@@ -390,6 +426,20 @@ function renderParticipants() {
         e.stopPropagation();
         socket.emit('toggle-spectator', { targetId: p.id });
       });
+
+      // Liberar/revogar alteração de voto após revelar (só faz sentido após o reveal, para jogadores)
+      if (state.revealed && !p.isSpectator) {
+        const canEdit = state.editableIds.includes(p.id);
+        const editBtn = document.createElement('button');
+        editBtn.className = 'mod-action-btn edit-permission-btn' + (canEdit ? ' active' : '');
+        editBtn.title = canEdit ? 'Bloquear alteração do voto após revelar' : 'Liberar alteração do voto após revelar';
+        editBtn.textContent = canEdit ? '🔓' : '🔒';
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          socket.emit('toggle-edit-permission', { targetId: p.id });
+        });
+        actions.appendChild(editBtn);
+      }
 
       const transferBtn = document.createElement('button');
       transferBtn.className = 'mod-action-btn';
@@ -574,16 +624,30 @@ function renderOutliers(outliers) {
   });
 }
 
+// Can the current user cast/change their vote right now?
+function canChangeVote() {
+  if (state.you?.isSpectator) return false;
+  // Before reveal: everyone votes freely. After reveal: only moderator or those liberados.
+  if (!state.revealed) return true;
+  return state.you?.isModerator || state.editableIds.includes(state.you?.id);
+}
+
 // === Actions ===
 function selectCard(value) {
   if (state.you?.isSpectator) return;
-  
+
+  // After reveal, only allow if the moderator liberou este participante
+  if (state.revealed && !canChangeVote()) {
+    showToast('🔒 O moderador não liberou você para alterar o voto após revelar.');
+    return;
+  }
+
   // Toggle: clicking the same card deselects it
   if (state.selectedCard === value) {
     return;
   }
   
-  // Select or change vote (works before and after reveal)
+  // Select or change vote
   state.selectedCard = value;
   if (!state.votedIds.includes(state.you.id)) {
     state.votedIds.push(state.you.id);
